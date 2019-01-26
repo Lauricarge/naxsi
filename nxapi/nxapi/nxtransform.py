@@ -541,7 +541,7 @@ class NxTranslate():
             template[field] = x
         if self.cfg["elastic"].get("version", None) == "1":
             esq['facets'] =  { "facet_results" : {"terms": { "field": field, "size" : self.es_max_size} }}
-        elif self.cfg["elastic"].get("version", None) == "2":
+        elif self.cfg["elastic"].get("version", None) in ["2", "5"]:
             esq['aggregations'] =  { "agg1" : {"terms": { "field": field, "size" : self.es_max_size} }}
         else:
             print "Unknown / Unspecified ES version in nxapi.json : {0}".format(self.cfg["elastic"].get("version", "#UNDEFINED"))
@@ -551,7 +551,7 @@ class NxTranslate():
 
         if self.cfg["elastic"].get("version", None) == "1":
             total = res['facets']['facet_results']['total']
-        elif self.cfg["elastic"].get("version", None) == "2":
+        elif self.cfg["elastic"].get("version", None) in ["2", "5"]:
             total = res['hits']['total']
         else:
             print "Unknown / Unspecified ES version in nxapi.json : {0}".format(self.cfg["elastic"].get("version", "#UNDEFINED"))
@@ -565,7 +565,7 @@ class NxTranslate():
                 count += 1
                 if count > limit:
                     break
-        elif self.cfg["elastic"].get("version", None) == "2":
+        elif self.cfg["elastic"].get("version", None) in ["2", "5"]:
             for x in res['aggregations']['agg1']['buckets']:
                 ret.append('{0} {1}% (total: {2}/{3})'.format(x['key'], round((float(x['doc_count']) / total) * 100, 2), x['doc_count'], total))
                 count += 1
@@ -584,7 +584,7 @@ class NxTranslate():
         #
         if self.cfg["elastic"].get("version", None) == "1":
             esq['facets'] =  { "facet_results" : {"terms": { "field": key, "size" : 50000} }}
-        elif self.cfg["elastic"].get("version", None) == "2":
+        elif self.cfg["elastic"].get("version", None) in ["2", "5"]:
             esq['aggregations'] =  { "agg1" : {"terms": { "field": key, "size" : 50000} }}
         else:
             print "Unknown / Unspecified ES version in nxapi.json : {0}".format(self.cfg["elastic"].get("version", "#UNDEFINED"))
@@ -595,7 +595,7 @@ class NxTranslate():
             for x in res['facets']['facet_results']['terms']:
                 if x['term'] not in uniques:
                     uniques.append(x['term'])
-        elif self.cfg["elastic"].get("version", None) == "2":
+        elif self.cfg["elastic"].get("version", None) in ["2", "5"]:
             for x in res['aggregations']['agg1']['buckets']:
                 if x['key'] not in uniques:
                     uniques.append(x['key'])
@@ -647,13 +647,17 @@ class NxTranslate():
         total_events = int(str(x["hits"]["total"]))
         print str(self.grn.format(total_events)) + " items to be tagged ..."
         size = int(x['hits']['total'])
-        if size > 100:
+        if size > 20000:
+            size = size / 100
+        elif size > 100:
             size = size / 10
         while count < total_events:
             esq["size"] = size
             esq["from"] = 0
             res = self.search(esq)
             # Iterate through matched evts to tag them.
+            if int(res['hits']['total']) == 0:
+                break
             for item in res['hits']['hits']:
                 eid = item['_id']
                 body = item['_source']

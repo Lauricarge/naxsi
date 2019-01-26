@@ -110,10 +110,6 @@ try:
 except ValueError:
     sys.exit(-1)
 
-if cfg.cfg["elastic"].get("version", None) is None:
-    print "Specify version '1' or '2' in [elasticsearch] section."
-    sys.exit(-1)
-
 if options.server is not None:
     cfg.cfg["global_filters"]["server"] = options.server
 
@@ -154,7 +150,20 @@ def get_filter(arg_filter):
 if options.filter is not None:
     cfg.cfg["global_filters"].update(get_filter(options.filter))
 
-es = elasticsearch.Elasticsearch(cfg.cfg["elastic"]["host"])
+try:
+    use_ssl = bool(cfg.cfg["elastic"]["use_ssl"])
+except KeyError:
+    use_ssl = False
+    
+es = elasticsearch.Elasticsearch(cfg.cfg["elastic"]["host"], use_ssl=use_ssl)
+# Get ES version from the client and avail it at cfg
+es_version =  es.info()['version'].get('number', None)
+if es_version is not None:
+    cfg.cfg["elastic"]["version"] = es_version.split(".")[0]
+if cfg.cfg["elastic"].get("version", None) is None:
+    print "Failed to get version from ES, Specify version ['1'/'2'/'5'] in [elasticsearch] section"
+    sys.exit(-1)
+
 translate = NxTranslate(es, cfg)
 
 
@@ -169,7 +178,7 @@ if options.full_auto is True:
     results = translate.full_auto()
     if results:
         for result in results:
-            print "{}".format(result)
+            print "{0}".format(result)
     else:
         print "No hits for this filter."
         sys.exit(1)
@@ -266,7 +275,12 @@ if options.ips is not None:
 # statistics
 if options.stats is True:
     print translate.red.format("# Whitelist(ing) ratio :")
-    translate.fetch_top(cfg.cfg["global_filters"], "whitelisted", limit=2)
+    for e in translate.fetch_top(cfg.cfg["global_filters"], "whitelisted", limit=2):
+        try:
+            list_e = e.split()
+            print '# {0} {1} {2}{3}'.format(translate.grn.format(list_e[0]), list_e[1], list_e[2], list_e[3])
+        except:
+            print "--malformed--"
     print translate.red.format("# Top servers :")
     for e in translate.fetch_top(cfg.cfg["global_filters"], "server", limit=10):
         try:
