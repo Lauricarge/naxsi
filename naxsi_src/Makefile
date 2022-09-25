@@ -12,8 +12,8 @@ FUZZ		?= 0
 STOCK		?= 1
 
 #Allows to force for specific UT only
-#TEST 		:= ""
-NGINX_VERS := "1.15.5"
+#TEST		:= ""
+NGINX_VERS	:= "1.19.2"
 
 
 NGINX_OPTIONS="--with-select_module"
@@ -40,6 +40,8 @@ all: nginx_download configure build install deploy
 
 re: clean all test
 
+format_code:
+	clang-format --verbose -i $(MOD_PATH)/*.c
 
 FUZZ_PATH := "../fuzz"
 AFL_PATH  := $(PWD)"/"$(FUZZ_PATH)"/afl/"
